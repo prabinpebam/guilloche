@@ -6,6 +6,12 @@
   <title>Guilloché Pattern Generator</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <style>
+    /* Ensure the canvas uses all available viewport (minus controls) */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
     body {
       display: flex;
       overflow: hidden;
@@ -20,13 +26,50 @@
     }
     #canvas-container {
       flex-grow: 1;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      position: relative;
+      background: #fff;
     }
     canvas {
-      max-width: 100%;
-      max-height: 100%;
+      display: block;
+    }
+    /* Custom styling for range sliders */
+    input[type="range"].form-range {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 8px;
+      background: #ddd;
+      border-radius: 5px;
+      outline: none;
+      margin: 0;
+    }
+    input[type="range"].form-range::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      cursor: pointer;
+      background: #ddd;
+      border-radius: 5px;
+    }
+    input[type="range"].form-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #007bff;
+      margin-top: -4px; /* Centers the thumb on the track */
+      cursor: pointer;
+    }
+    input[type="range"].form-range::-moz-range-track {
+      width: 100%;
+      height: 8px;
+      background: #ddd;
+      border-radius: 5px;
+    }
+    input[type="range"].form-range::-moz-range-thumb {
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #007bff;
+      cursor: pointer;
     }
     .control-group {
       margin-bottom: 15px;
@@ -37,28 +80,45 @@
       border-top: 1px solid #ddd;
       padding-top: 10px;
     }
+    /* Title overlay styling */
+    #title {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: sans-serif;
+      z-index: 10;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
   <div id="canvas-container">
     <canvas id="guillocheCanvas"></canvas>
+    <div id="title">
+      <h2>Guilloche Pattern Generator</h2>
+      <div>by Prabin Pebam</div>
+    </div>
   </div>
   <div id="controls">
     <h5>Core Parameters</h5>
     <div class="control-group">
       <label for="R" class="form-label">Fixed Circle Radius (R):</label>
-      <input type="range" class="form-range" id="R" min="50" max="300" value="150">
-      <span id="R_val">150</span>
+      <input type="range" class="form-range" id="R" min="50" max="300" value="136">
+      <span id="R_val">136</span>
     </div>
     <div class="control-group">
       <label for="r" class="form-label">Rolling Circle Radius (r):</label>
-      <input type="range" class="form-range" id="r" min="10" max="150" value="50">
-      <span id="r_val">50</span>
+      <input type="range" class="form-range" id="r" min="10" max="150" value="39">
+      <span id="r_val">39</span>
     </div>
     <div class="control-group">
       <label for="d" class="form-label">Pen Distance (d):</label>
-      <input type="range" class="form-range" id="d" min="0" max="150" value="50">
-      <span id="d_val">50</span>
+      <input type="range" class="form-range" id="d" min="0" max="150" value="95">
+      <span id="d_val">95</span>
     </div>
     <div class="control-group">
       <label for="num_curves" class="form-label">Number of Layered Curves:</label>
@@ -72,11 +132,10 @@
     </div>
     <div class="control-group">
       <label for="t_range" class="form-label">t Range (rotations):</label>
-      <!-- A number input with no max cap -->
-      <input type="number" class="form-control" id="t_range" value="10" step="1">
-      <span id="t_range_val">10</span>
+      <input type="number" class="form-control" id="t_range" value="57" step="1">
+      <span id="t_range_val">57</span>
       <div class="form-text">
-        Calculated perfect closure: <span id="t_closure">?</span> rotations
+        Calculated perfect closure: <span id="t_closure">39</span> rotations
       </div>
     </div>
     <div class="control-group">
@@ -127,8 +186,8 @@
     </div>
     <div class="control-group">
       <label for="dispFreq" class="form-label">Displacement Frequency:</label>
-      <input type="number" class="form-control" id="dispFreq" value="5" step="1" min="1" max="20">
-      <span id="dispFreq_val">5</span>
+      <input type="number" class="form-control" id="dispFreq" value="6" step="1" min="1" max="20">
+      <span id="dispFreq_val">6</span>
     </div>
     <div class="control-group">
       <label for="dispPhase" class="form-label">Displacement Phase (°):</label>
@@ -137,9 +196,23 @@
     </div>
     <div class="control-group">
       <label for="dispExp" class="form-label">Displacement Exponent:</label>
-      <input type="number" class="form-control" id="dispExp" value="1" step="0.1" min="0.1" max="5">
-      <span id="dispExp_val">1</span>
+      <input type="number" class="form-control" id="dispExp" value="5" step="0.1" min="0.1" max="5">
+      <span id="dispExp_val">5</span>
     </div>
+    
+    <div class="section-header">Animation & Appearance</div>
+    <div class="control-group">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="animateToggle" checked>
+        <label class="form-check-label" for="animateToggle">Animate</label>
+      </div>
+    </div>
+    <div class="control-group">
+      <label for="canvasBg" class="form-label">Canvas Background Color:</label>
+      <input type="color" class="form-control" id="canvasBg" value="#ffffff">
+      <span id="canvasBg_val">#ffffff</span>
+    </div>
+    
     <div class="control-group">
       <button id="exportSVG" class="btn btn-primary">Export SVG</button>
     </div>

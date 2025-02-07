@@ -1,30 +1,40 @@
+// Get canvas and context.
 const canvas = document.getElementById("guillocheCanvas");
 const ctx = canvas.getContext("2d");
-canvas.width = 800;
-canvas.height = 800;
 
-// Helper: update display spans.
+// Resize the canvas to use the full available viewport (minus controls).
+function resizeCanvas() {
+  const controlsWidth = document.getElementById("controls").offsetWidth;
+  canvas.width = window.innerWidth - controlsWidth;
+  canvas.height = window.innerHeight;
+  update();
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+// ----- Helper Functions -----
 function updateDisplay(id, value) {
   document.getElementById(id).textContent = value;
 }
 
-// Helper: Euclidean distance between two points.
 function distance(p1, p2) {
   return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
 }
 
-// Color helpers.
 function hexToRgb(hex) {
   hex = hex.replace(/^#/, '');
   return {
-    r: parseInt(hex.substring(0,2), 16),
-    g: parseInt(hex.substring(2,4), 16),
-    b: parseInt(hex.substring(4,6), 16)
+    r: parseInt(hex.substring(0, 2), 16),
+    g: parseInt(hex.substring(2, 4), 16),
+    b: parseInt(hex.substring(4, 6), 16)
   };
 }
 
 function rgbToHex(r, g, b) {
-  const toHex = (c) => { let hex = c.toString(16); return hex.length === 1 ? "0" + hex : hex; };
+  const toHex = (c) => {
+    let hex = c.toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  };
   return "#" + toHex(r) + toHex(g) + toHex(b);
 }
 
@@ -47,7 +57,6 @@ function getGradientColor(t, colors) {
   return interpolateColor(colors[index], colors[index + 1], t_local);
 }
 
-// Compute spirograph point using standard equations.
 function computePoint(R, r, d, t_eff) {
   const epsilon = 0.0001;
   let x, y;
@@ -67,15 +76,16 @@ function computePoint(R, r, d, t_eff) {
   return { x, y };
 }
 
-/**
- * Draws the Guilloché pattern and then applies a polar displacement to each point.
- *
- * New displacement parameters:
- * - dispAmp: Displacement Amplitude.
- * - dispFreq: Displacement Frequency.
- * - dispPhase: Displacement Phase (in degrees).
- * - dispExp: Displacement Exponent.
- */
+// ----- Canvas Background Update -----
+// Updates the canvas background color based on the canvasBg color picker.
+function updateCanvasBackground() {
+  const bgColor = document.getElementById("canvasBg").value;
+  canvas.style.backgroundColor = bgColor;
+  updateDisplay("canvasBg_val", bgColor);
+}
+
+// ----- Drawing Function -----
+// Draws the Guilloché pattern, applies polar displacement, and colors segments with a looping gradient.
 function drawGuilloche(R, r, d, num_curves, offset_deg, t_range_rotations, t_step, global_rotation_deg, thickness, gradientLoopCount, colors, dispAmp, dispFreq, dispPhase, dispExp) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.lineWidth = thickness;
@@ -86,24 +96,18 @@ function drawGuilloche(R, r, d, num_curves, offset_deg, t_range_rotations, t_ste
   const globalRot = global_rotation_deg * Math.PI / 180;
   const dispPhaseRad = dispPhase * Math.PI / 180;
   
-  // For each layered curve.
   for (let curveIndex = 0; curveIndex < num_curves; curveIndex++) {
     const curve_offset = offset_rad * curveIndex;
     let points = [];
-    // Compute base points along the curve.
     for (let t = 0; t <= total_t; t += t_step) {
       const t_eff = t + curve_offset;
       let pt = computePoint(R, r, d, t_eff);
-      // Translate to canvas center.
       pt.x += centerX;
       pt.y += centerY;
-      // Apply global rotation about canvas center.
       const dx = pt.x - centerX;
       const dy = pt.y - centerY;
       const rotatedX = centerX + dx * Math.cos(globalRot) - dy * Math.sin(globalRot);
       const rotatedY = centerY + dx * Math.sin(globalRot) + dy * Math.cos(globalRot);
-      
-      // Now apply polar displacement:
       let angle = Math.atan2(rotatedY - centerY, rotatedX - centerX);
       let r_orig = Math.sqrt((rotatedX - centerX) ** 2 + (rotatedY - centerY) ** 2);
       let s = Math.sin(dispFreq * angle + dispPhaseRad);
@@ -114,7 +118,6 @@ function drawGuilloche(R, r, d, num_curves, offset_deg, t_range_rotations, t_ste
       points.push({ x: finalX, y: finalY });
     }
     
-    // Compute total curve length for gradient mapping.
     let totalLength = 0;
     let segLengths = [];
     for (let i = 0; i < points.length - 1; i++) {
@@ -123,14 +126,12 @@ function drawGuilloche(R, r, d, num_curves, offset_deg, t_range_rotations, t_ste
       totalLength += segLen;
     }
     
-    // Draw each segment with a color from the looping gradient.
     let cumulativeLength = 0;
     for (let i = 0; i < points.length - 1; i++) {
       const p0 = points[i];
       const p1 = points[i + 1];
       const segLen = segLengths[i];
       const pos = (cumulativeLength + segLen / 2) / totalLength;
-      // Map pos to a gradient parameter that loops gradientLoopCount times.
       const colorPos = (pos * gradientLoopCount) % 1;
       const color = getGradientColor(colorPos, colors);
       ctx.strokeStyle = color;
@@ -143,11 +144,10 @@ function drawGuilloche(R, r, d, num_curves, offset_deg, t_range_rotations, t_ste
   }
 }
 
-/**
- * Updates the drawing based on current control values.
- * Also calculates the perfect closure (number of rotations for seamless loop).
- */
+// ----- Update & Animation -----
 function update() {
+  updateCanvasBackground(); // Update the canvas background color in real time.
+  
   // Core parameters.
   const R = parseFloat(document.getElementById("R").value);
   const r = parseFloat(document.getElementById("r").value);
@@ -165,10 +165,11 @@ function update() {
     document.getElementById("color3").value,
     document.getElementById("color4").value
   ];
-  // Secondary (displacement) parameters.
-  const dispAmp = parseFloat(document.getElementById("dispAmp").value);
-  const dispFreq = parseFloat(document.getElementById("dispFreq").value);
-  const dispPhase = parseFloat(document.getElementById("dispPhase").value);
+  
+  // Secondary (polar displacement) parameters (base values).
+  const baseDispAmp = parseFloat(document.getElementById("dispAmp").value);
+  const baseDispFreq = parseFloat(document.getElementById("dispFreq").value);
+  const baseDispPhase = parseFloat(document.getElementById("dispPhase").value);
   const dispExp = parseFloat(document.getElementById("dispExp").value);
   
   // Update display spans.
@@ -182,9 +183,9 @@ function update() {
   updateDisplay("rotation_val", global_rotation_deg);
   updateDisplay("thickness_val", thickness);
   updateDisplay("gradientLoops_val", gradientLoopCount);
-  updateDisplay("dispAmp_val", dispAmp);
-  updateDisplay("dispFreq_val", dispFreq);
-  updateDisplay("dispPhase_val", dispPhase);
+  updateDisplay("dispAmp_val", baseDispAmp);
+  updateDisplay("dispFreq_val", baseDispFreq);
+  updateDisplay("dispPhase_val", baseDispPhase);
   updateDisplay("dispExp_val", dispExp);
   
   // Calculate perfect closure.
@@ -206,17 +207,65 @@ function update() {
   const perfectClosure = approximateClosure(ratio);
   document.getElementById("t_closure").textContent = perfectClosure;
   
-  // Draw the pattern with displacement applied.
-  drawGuilloche(R, r, d, num_curves, offset_deg, t_range_rotations, t_step, global_rotation_deg, thickness, gradientLoopCount, colors, dispAmp, dispFreq, dispPhase, dispExp);
+  // If animation is enabled, modify the secondary parameters.
+  let dispAmpToUse = baseDispAmp;
+  let dispPhaseToUse = baseDispPhase;
+  if (document.getElementById("animateToggle").checked) {
+    const period = 5000; // 5 seconds per full cycle.
+    const now = Date.now();
+    const elapsed = now % period;
+    const phaseOffset = (elapsed / period) * 360; // in degrees
+    const ampOffset = 30 * Math.sin((elapsed / period) * 2 * Math.PI);
+    dispPhaseToUse = baseDispPhase + phaseOffset;
+    dispAmpToUse = baseDispAmp + ampOffset;
+  }
+  
+  // Draw the pattern.
+  drawGuilloche(R, r, d, num_curves, offset_deg, t_range_rotations, t_step, global_rotation_deg, thickness, gradientLoopCount, colors, dispAmpToUse, baseDispFreq, dispPhaseToUse, dispExp);
 }
 
-/**
- * Exports the current pattern as an SVG file.
- * The SVG uses a repeating linear gradient for the stroke.
- * The same polar displacement is applied to the generated path.
- */
+// Animation loop.
+function animationLoop() {
+  if (document.getElementById("animateToggle").checked) {
+    update();
+    requestAnimationFrame(animationLoop);
+  }
+}
+
+// Listen to changes on the animate toggle.
+document.getElementById("animateToggle").addEventListener("change", function () {
+  if (this.checked) {
+    requestAnimationFrame(animationLoop);
+  } else {
+    update();
+  }
+});
+
+// Listen to changes on the canvas background color picker.
+document.getElementById("canvasBg").addEventListener("input", update);
+
+// Add event listeners for all controls.
+const controls = [
+  "R", "r", "d", "num_curves", "offset",
+  "t_range", "t_step", "rotation", "thickness",
+  "color1", "color2", "color3", "color4",
+  "gradientLoops", "dispAmp", "dispFreq", "dispPhase", "dispExp"
+];
+controls.forEach(id => {
+  document.getElementById(id).addEventListener("input", update);
+});
+document.getElementById("exportSVG").addEventListener("click", exportSVG);
+
+// On page load, if animate is checked, start the animation loop.
+if (document.getElementById("animateToggle").checked) {
+  requestAnimationFrame(animationLoop);
+}
+
+// Initial drawing.
+update();
+
+// ----- Export SVG Function -----
 function exportSVG() {
-  // (For brevity, this export function follows similar logic as canvas drawing.)
   const R = parseFloat(document.getElementById("R").value);
   const r = parseFloat(document.getElementById("r").value);
   const d = parseFloat(document.getElementById("d").value);
@@ -233,17 +282,28 @@ function exportSVG() {
     document.getElementById("color3").value,
     document.getElementById("color4").value
   ];
-  const dispAmp = parseFloat(document.getElementById("dispAmp").value);
-  const dispFreq = parseFloat(document.getElementById("dispFreq").value);
-  const dispPhase = parseFloat(document.getElementById("dispPhase").value);
+  const baseDispAmp = parseFloat(document.getElementById("dispAmp").value);
+  const baseDispFreq = parseFloat(document.getElementById("dispFreq").value);
+  const baseDispPhase = parseFloat(document.getElementById("dispPhase").value);
   const dispExp = parseFloat(document.getElementById("dispExp").value);
+  
+  let dispAmpToUse = baseDispAmp;
+  let dispPhaseToUse = baseDispPhase;
+  if (document.getElementById("animateToggle").checked) {
+    const period = 5000;
+    const now = Date.now();
+    const elapsed = now % period;
+    const phaseOffset = (elapsed / period) * 360;
+    const ampOffset = 30 * Math.sin((elapsed / period) * 2 * Math.PI);
+    dispPhaseToUse = baseDispPhase + phaseOffset;
+    dispAmpToUse = baseDispAmp + ampOffset;
+  }
   
   const centerX = 400, centerY = 400;
   const total_t = t_range_rotations * 2 * Math.PI;
   const offset_rad = offset_deg * Math.PI / 180;
   const globalRot = global_rotation_deg * Math.PI / 180;
-  const dispPhaseRad = dispPhase * Math.PI / 180;
-  
+  const dispPhaseRad = dispPhaseToUse * Math.PI / 180;
   let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800">\n`;
   svgContent += `<defs>\n  <linearGradient id="lineGradient" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1" y2="0" spreadMethod="repeat" gradientTransform="scale(${gradientLoopCount},1)">\n`;
   const stops = [0, 0.33, 0.67, 1];
@@ -252,7 +312,6 @@ function exportSVG() {
   }
   svgContent += `  </linearGradient>\n</defs>\n`;
   
-  // For each layered curve.
   for (let curveIndex = 0; curveIndex < num_curves; curveIndex++) {
     const curve_offset = offset_rad * curveIndex;
     let pathData = "";
@@ -262,15 +321,13 @@ function exportSVG() {
       let pt = computePoint(R, r, d, t_eff);
       pt.x += centerX;
       pt.y += centerY;
-      // Global rotation.
       const dx = pt.x - centerX, dy = pt.y - centerY;
       const rotatedX = centerX + dx * Math.cos(globalRot) - dy * Math.sin(globalRot);
       const rotatedY = centerY + dx * Math.sin(globalRot) + dy * Math.cos(globalRot);
-      // Apply displacement.
       let angle = Math.atan2(rotatedY - centerY, rotatedX - centerX);
       let r_orig = Math.sqrt((rotatedX - centerX) ** 2 + (rotatedY - centerY) ** 2);
-      let s = Math.sin(dispFreq * angle + dispPhaseRad);
-      let mod = Math.sign(s) * Math.pow(Math.abs(s), dispExp) * dispAmp;
+      let s = Math.sin(baseDispFreq * angle + dispPhaseRad);
+      let mod = Math.sign(s) * Math.pow(Math.abs(s), dispExp) * dispAmpToUse;
       let new_r = r_orig + mod;
       let finalX = centerX + new_r * Math.cos(angle);
       let finalY = centerY + new_r * Math.sin(angle);
@@ -288,18 +345,3 @@ function exportSVG() {
   link.download = "guilloche.svg";
   link.click();
 }
-
-// Add event listeners for all controls.
-const controls = [
-  "R", "r", "d", "num_curves", "offset",
-  "t_range", "t_step", "rotation", "thickness",
-  "color1", "color2", "color3", "color4",
-  "gradientLoops", "dispAmp", "dispFreq", "dispPhase", "dispExp"
-];
-controls.forEach(id => {
-  document.getElementById(id).addEventListener("input", update);
-});
-document.getElementById("exportSVG").addEventListener("click", exportSVG);
-
-// Initial drawing.
-update();
