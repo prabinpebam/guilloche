@@ -1,5 +1,5 @@
 # Guilloché Pattern Generator
-Prabi Pebam
+Prabin Pebam
 
 This project is a web-based interactive Guilloché Pattern Generator built using HTML, JavaScript, and Bootstrap. It creates intricate, mathematically derived patterns reminiscent of traditional Guilloché designs and offers a wide range of parameters for real-time customization and animation.
 
